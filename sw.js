@@ -1,7 +1,7 @@
 // Simple Service Worker for Maalem PWA
-const CACHE_NAME = 'maalem-cache-v4'; // Increment cache version
+const CACHE_NAME = 'maalem-cache-v5'; // Increment cache version
 const ASSETS = [
-  '/Maalem.dc.html',
+  '/Maalem.dc',
   '/manifest.json',
   '/maalem-logo.png',
   '/maalem-mark.png',
@@ -10,6 +10,7 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', event => {
+  self.skipWaiting(); // Force the waiting service worker to become active
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
       return cache.addAll(ASSETS).catch(err => {
@@ -25,7 +26,7 @@ self.addEventListener('activate', event => {
       return Promise.all(
         keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
       );
-    })
+    }).then(() => self.clients.claim()) // Claim clients immediately
   );
 });
 
@@ -35,14 +36,13 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(event.request.url);
   
-  // If requesting /Maalem.dc, root (/), or /index.html, serve the cached /Maalem.dc.html
+  // If requesting /Maalem.dc, root (/), or /index.html, serve the cached /Maalem.dc
   if (url.pathname === '/Maalem.dc' || url.pathname === '/' || url.pathname === '/index.html') {
     event.respondWith(
-      caches.match('/Maalem.dc.html').then(cached => {
+      caches.match('/Maalem.dc').then(cached => {
         if (cached) return cached;
-        // Fallback: fetch the clean physical /Maalem.dc.html file
-        // to avoid infinite recursion loops in the fetch handler.
-        return fetch('/Maalem.dc.html');
+        // Fallback: fetch the clean /Maalem.dc route
+        return fetch('/Maalem.dc');
       })
     );
     return;
