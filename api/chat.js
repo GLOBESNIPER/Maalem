@@ -20,9 +20,9 @@ module.exports = async (req, res) => {
 
     let scriptInstruction = "";
     if (lang === 'ar') {
-      scriptInstruction = "IMPORTANT: You must respond in Moroccan Arabic (Darija) or Standard Arabic using the ARABIC SCRIPT. DO NOT use Latin letters / Arabizi.";
+      scriptInstruction = "IMPORTANT: You must respond in Standard Arabic (Fusha) using the ARABIC SCRIPT.";
     } else if (lang === 'da') {
-      scriptInstruction = "IMPORTANT: You must respond in Moroccan Arabic (Darija) written entirely in Latin letters / Arabizi script (using numbers like 3, 7, 9 for Arabic letters where appropriate, mixed with French words where natural, e.g. \"salam sadiqi, le portfolio dyalek mzyan bzaff...\"). DO NOT use the Arabic script.";
+      scriptInstruction = "IMPORTANT: You must respond in Moroccan Arabic (Darija) using the ARABIC SCRIPT. DO NOT use Latin letters / Arabizi.";
     } else {
       scriptInstruction = "Respond in English.";
     }
@@ -65,10 +65,7 @@ When asked about artisan events, fairs, programs, or cooperative opportunities i
 
 You must respond in a valid JSON object format with exactly two fields:
 1. "text": The response text to show in the chat (in the requested script and language).
-2. "audioText": The response text to be read aloud. 
-   - CRITICAL: If the language is Moroccan Arabic / Darija in Arabizi (Latin script), "audioText" MUST be the exact same response translated/transliterated into Arabic script (Moroccan Arabic / Darija in Arabic characters) so it can be correctly spoken by an Arabic text-to-speech voice.
-   - For Standard Arabic, "audioText" should be the same as "text".
-   - For English, "audioText" should be the same as "text".
+2. "audioText": The response text to be read aloud (should be the exact same as "text" since both are in the requested script).
 
 Do not return any markdown formatting around the JSON, just the raw JSON object.`;
 

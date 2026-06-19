@@ -1,5 +1,5 @@
 // Simple Service Worker for Maalem PWA
-const CACHE_NAME = 'maalem-cache-v6'; // Increment cache version
+const CACHE_NAME = 'maalem-cache-v8'; // Increment cache version
 const ASSETS = [
   '/Maalem.dc',
   '/manifest.json',
