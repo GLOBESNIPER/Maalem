@@ -9,6 +9,11 @@
   "icons": [
     {
       "src": "/maalem-logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/maalem-logo.png",
       "sizes": "512x512",
       "type": "image/png"
     }
