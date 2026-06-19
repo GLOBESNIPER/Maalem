@@ -955,8 +955,17 @@ class Component extends DCLogic {
   toggleVoiceMode() {
     const next = !this.state.voiceMode;
     this.setState({ voiceMode: next });
-    if (!next && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
+    if (next) {
+      // Find the last bot message and read it aloud
+      const botMsgs = this.state.messages.filter(m => m.role === 'bot');
+      if (botMsgs.length > 0) {
+        const lastBotMsg = botMsgs[botMsgs.length - 1];
+        this.speak(lastBotMsg.audioText || lastBotMsg.text, lastBotMsg.text);
+      }
+    } else {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
     }
   }
 
@@ -1057,42 +1066,70 @@ class Component extends DCLogic {
       window.speechSynthesis.resume();
     }
 
-    const targetText = isFallback ? (fallbackText || text) : (text || fallbackText);
-    const cleanText = targetText.replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDC00-\uDFFF]/g, '').replace(/[*_`#]/g, '');
-    
+    // Cancel any current speaking to reset the speech synthesis queue
+    this._cancelledSpeak = false;
+    window.speechSynthesis.cancel();
+
     const voices = window.speechSynthesis.getVoices() || [];
-    const hasArabicVoice = !isFallback && (voices.length === 0 || voices.some(v => v.lang.startsWith('ar')));
+    const hasArabicVoice = voices.some(v => v.lang.startsWith('ar'));
     
-    let textToSpeak = cleanText;
-    const hasArabic = /[\u0600-\u06FF]/.test(cleanText);
+    // Determine what to speak and what language to use
+    let textToSpeak = "";
+    let langToUse = "en-US";
     
-    if (this.state.lang === 'da' && !hasArabic && hasArabicVoice) {
-      textToSpeak = this.toArabicScript(cleanText);
+    if (this.state.lang === 'en') {
+      textToSpeak = isFallback ? (fallbackText || text) : (text || fallbackText);
+      langToUse = "en-US";
+    } else if (this.state.lang === 'ar') {
+      textToSpeak = isFallback ? (fallbackText || text) : (text || fallbackText);
+      langToUse = "ar-SA";
+    } else if (this.state.lang === 'da') {
+      // Darija (Arabizi text vs Arabic script audioText)
+      if (isFallback) {
+        // Fallback: speak the Arabizi (Latin script) using French voice
+        textToSpeak = fallbackText || text;
+        langToUse = "fr-FR";
+      } else {
+        // Normal: if we have Arabic voice (or voices list is still empty/loading), try Arabic script
+        if (hasArabicVoice || voices.length === 0) {
+          textToSpeak = text || fallbackText;
+          langToUse = "ar-SA";
+        } else {
+          // No Arabic voice available, fall back immediately to Arabizi with French voice
+          textToSpeak = fallbackText || text;
+          langToUse = "fr-FR";
+        }
+      }
     }
 
-    const utterance = new SpeechSynthesisUtterance(textToSpeak);
-    const isArabic = /[\u0600-\u06FF]/.test(textToSpeak);
+    // Clean up any markdown/emojis
+    const cleanText = textToSpeak.replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDC00-\uDFFF]/g, '').replace(/[*_`#]/g, '');
+    if (!cleanText.trim()) return;
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
     
-    if (isArabic && hasArabicVoice) {
-      const hasArMA = voices.some(v => v.lang.startsWith('ar-MA'));
-      utterance.lang = hasArMA ? 'ar-MA' : 'ar-SA';
-    } else {
-      const langMap = { en: 'en-US', da: 'fr-FR', ar: 'ar-SA' };
-      utterance.lang = langMap[this.state.lang] || 'en-US';
-    }
-    
+    // Choose correct voice based on language and availability
     if (voices.length > 0) {
       let voice;
-      if (isArabic && hasArabicVoice) {
+      if (langToUse.startsWith('ar')) {
+        const hasArMA = voices.some(v => v.lang.startsWith('ar-MA'));
+        utterance.lang = hasArMA ? 'ar-MA' : 'ar-SA';
+        
         voice = voices.find(v => (v.lang === 'ar-MA' || v.lang.startsWith('ar-MA')) && v.localService) ||
                 voices.find(v => v.lang.startsWith('ar') && v.localService) ||
                 voices.find(v => v.lang.startsWith('ar'));
       } else {
+        utterance.lang = langToUse;
         voice = voices.find(v => v.lang.startsWith(utterance.lang) && v.localService) ||
                 voices.find(v => v.lang.startsWith(utterance.lang));
       }
       if (voice) utterance.voice = voice;
+    } else {
+      utterance.lang = langToUse;
     }
+
+    // Save reference to prevent garbage collection
+    this._activeUtterance = utterance;
 
     const startTime = Date.now();
     utterance.onend = () => {
@@ -1136,18 +1173,10 @@ class Component extends DCLogic {
       this.setState({ voiceMode: false });
     };
 
-    // Prevent Chrome SpeechSynthesis engine freeze due to overlapping cancels
-    if (window.speechSynthesis.speaking) {
-      this._cancelledSpeak = true;
-      window.speechSynthesis.cancel();
-      setTimeout(() => {
-        this._cancelledSpeak = false;
-        window.speechSynthesis.speak(utterance);
-      }, 100);
-    } else {
-      this._cancelledSpeak = false;
+    // Play with a tiny delay to allow cancel to process
+    setTimeout(() => {
       window.speechSynthesis.speak(utterance);
-    }
+    }, 50);
   }
 
   stopVoiceAndSubmit(){
